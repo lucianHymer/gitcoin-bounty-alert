@@ -1,6 +1,8 @@
 const axios = require('axios')
 
 const PAGE_SIZE = 10
+const MINUTES_BETWEEN_CHECKS = 10
+const GITCOIN_API_RATE_LIMIT_MS = 3000
 
 class TimeoutError extends Error {}
 
@@ -54,7 +56,7 @@ const getBounties = withRateLimit(params => {
         }
       })
   })
-}, 3000)
+}, GITCOIN_API_RATE_LIMIT_MS)
 
 const makeBountyFetcher = startTime => {
   let lastCheckedTime = startTime
@@ -99,7 +101,7 @@ const makeBountyFetcher = startTime => {
 }
 
 function main () {
-  const interval = 10 * 60 * 1000
+  const interval = MINUTES_BETWEEN_CHECKS * 60 * 1000
   const bountyFetcher = makeBountyFetcher(new Date('7/18/22'))
   // const bountyFetcher = makeBountyFetcher(new Date())
   bountyFetcher.listNew()
