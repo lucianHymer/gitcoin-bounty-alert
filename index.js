@@ -71,7 +71,7 @@ const makeBountyFetcher = startTime => {
         )
         bountiesOfInterest.push(...bounties)
         offset += PAGE_SIZE
-      } while (bounties.length)
+      } while (bounties.length >= PAGE_SIZE)
 
       lastCheckedTime = new Date()
     } catch (e) {
@@ -82,11 +82,18 @@ const makeBountyFetcher = startTime => {
       }
     }
 
-    console.log(bountiesOfInterest)
     return bountiesOfInterest
   }
 
-  const listNew = () => console.log(fetchNew())
+  const listNew = async () => {
+    const bounties = await fetchNew()
+    console.log(
+      bounties.map(
+        ({ title, created_on }) => ({ title, created_on }) // eslint-disable-line camelcase
+      )
+    )
+    console.log(bounties.length, 'new bounties')
+  }
 
   return { listNew, fetchNew }
 }
@@ -95,8 +102,8 @@ function main () {
   const interval = 10 * 60 * 1000
   const bountyFetcher = makeBountyFetcher(new Date('7/18/22'))
   // const bountyFetcher = makeBountyFetcher(new Date())
-  bountyFetcher.fetchNew()
-  setInterval(bountyFetcher.fetchNew, interval)
+  bountyFetcher.listNew()
+  setInterval(bountyFetcher.listNew, interval)
 }
 
 main()
