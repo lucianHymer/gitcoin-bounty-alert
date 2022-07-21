@@ -1,3 +1,4 @@
+require('dotenv').config()
 const axios = require('axios')
 
 const PAGE_SIZE = 10
@@ -6,6 +7,7 @@ const GITCOIN_API_RATE_LIMIT_MS = 3000
 
 class TimeoutError extends Error {}
 
+// This is only effective when used procedurally
 const withRateLimit = (func, msRateLimit) => {
   let nextScheduled = Date.now()
   let first = true
@@ -28,6 +30,57 @@ const withRateLimit = (func, msRateLimit) => {
   const getNextTime = () => (nextScheduled += msRateLimit)
 
   return args => scheduleCall(args, getNextTime())
+}
+
+class DiscordHook {
+  writeToHook (payload, hookUrl) {
+    axios.post(hookUrl, payload).catch(e => console.log(e))
+  }
+
+  writeObjectToHook (title, object, hookUrl) {
+    this.writeToHook(
+      {
+        embeds: [
+          {
+            title,
+            fields: Object.entries(object).map(([name, value]) => ({
+              name,
+              value
+            }))
+          }
+        ]
+      },
+      hookUrl
+    )
+  }
+}
+
+class GitcoinDiscordHook extends DiscordHook {
+  writeArray (bountyDescriptions) {
+    if (!bountyDescriptions.length) return
+    if (bountyDescriptions.length > 1) {
+      const collatedBountiesDescription = bountyDescriptions.reduce(
+        (collated, bountyDescription, index) => {
+          Object.entries(bountyDescription).map(
+            ([key, value]) => (collated[key + ' ' + index] = value)
+          )
+          return collated
+        },
+        {}
+      )
+      this.writeObjectToHook(
+        'New Gitcoin Bounties',
+        collatedBountiesDescription,
+        process.env.DISCORD_GITCOIN_WEBHOOK_URL
+      )
+    } else {
+      this.writeObjectToHook(
+        'New Gitcoin Bounty',
+        bountyDescriptions[0],
+        process.env.DISCORD_GITCOIN_WEBHOOK_URL
+      )
+    }
+  }
 }
 
 const getBounties = withRateLimit(params => {
@@ -88,24 +141,38 @@ const makeBountyFetcher = startTime => {
   }
 
   const listNew = async () => {
-    const bounties = await fetchNew()
-    console.log(
-      bounties.map(
-        ({ title, created_on }) => ({ title, created_on }) // eslint-disable-line camelcase
-      )
-    )
-    console.log(bounties.length, 'new bounties')
+    const bountyDescriptions = await getNewBountyDescriptions()
+    console.log(bountyDescriptions)
+    console.log(bountyDescriptions.length, 'new bounties')
   }
 
-  return { listNew, fetchNew }
+  const getNewBountyDescriptions = async () => {
+    const bounties = await fetchNew()
+    return bounties.map(
+      ({ title, created_on }) => ({ Title: title, 'Date Created': created_on }) // eslint-disable-line camelcase
+    )
+  }
+
+  const makeReporter = outputChannel => async () => {
+    const bountyDescriptions = await getNewBountyDescriptions()
+    outputChannel.writeArray(bountyDescriptions)
+    console.log(
+      bountyDescriptions.length,
+      'new bounties written to output channel'
+    )
+  }
+
+  return { listNew, fetchNew, makeReporter }
 }
 
 function main () {
+  const discordHook = new GitcoinDiscordHook()
   const interval = MINUTES_BETWEEN_CHECKS * 60 * 1000
-  const bountyFetcher = makeBountyFetcher(new Date('7/18/22'))
+  const bountyFetcher = makeBountyFetcher(new Date('7/19/22'))
   // const bountyFetcher = makeBountyFetcher(new Date())
-  bountyFetcher.listNew()
-  setInterval(bountyFetcher.listNew, interval)
+  const reportBounties = bountyFetcher.makeReporter(discordHook)
+  reportBounties()
+  setInterval(reportBounties, interval)
 }
 
 main()
