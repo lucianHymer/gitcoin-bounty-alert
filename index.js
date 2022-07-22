@@ -168,8 +168,7 @@ const makeBountyFetcher = startTime => {
 function main () {
   const discordHook = new GitcoinDiscordHook()
   const interval = MINUTES_BETWEEN_CHECKS * 60 * 1000
-  const bountyFetcher = makeBountyFetcher(new Date('7/19/22'))
-  // const bountyFetcher = makeBountyFetcher(new Date())
+  const bountyFetcher = makeBountyFetcher(new Date())
   const reportBounties = bountyFetcher.makeReporter(discordHook)
   reportBounties()
   setInterval(reportBounties, interval)
